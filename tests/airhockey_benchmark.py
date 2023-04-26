@@ -1,6 +1,7 @@
 from __future__ import print_function
 import argparse
 import math
+import time
 import numpy as np
 import sys, os
 
@@ -18,7 +19,9 @@ from constraints.airhockey_ompl_constraint import AirHockeyCircleConstraint
 
 
 
-def airhockey_planning_once(cp, plannername, output):
+def airhockey_planning_once(cp, plannername, env, output, play=False):
+    env_info = env.env_info
+
     cp.setPlanner(plannername, "airhockey")
 
     # Solve the problem
@@ -36,6 +39,42 @@ def airhockey_planning_once(cp, plannername, output):
     cp.atlasStats()
     if output:
         cp.dumpGraph("airhockey")
+
+    if stat:
+        current_ee_pose = forward_kinematics(
+            env_info['robot']['robot_model'],
+            env_info['robot']['robot_data'],
+            cp.out_path[0,:]
+        )[0]
+
+        out_path = np.zeros(cp.out_path.shape)
+        for i in range(cp.out_path.shape[0]):
+            ee_pose = forward_kinematics(
+                env_info['robot']['robot_model'],
+                env_info['robot']['robot_data'],
+                cp.out_path[i,:]
+            )[0]
+            out_path[i,:] = ee_pose
+        t = np.arange(0, 2*np.pi, 0.05)
+        x = np.reshape(np.cos(t)*0.1 + current_ee_pose[0]+0.1, (-1,1))
+        y = np.reshape(np.sin(t)*0.1+ current_ee_pose[1],(-1,1))
+        if play:
+            plot_path(out_path, np.concatenate([x,y], axis=1))
+
+        steps = -1
+        if play:
+            while True:
+                steps += 1
+                t_start = time.time()
+                if ((steps-1)/cp.out_path.shape[0])%2 == 0:
+                    action = np.flip(cp.out_path, axis=0)[(steps-1)%cp.out_path.shape[0],:]
+                else:
+                    action = cp.out_path[(steps-1)%cp.out_path.shape[0],:]
+                
+                joints_pose_vel = np.vstack([action,np.zeros(action.shape)])
+                obs, reward, done, info = env.step(joints_pose_vel)
+
+                env.render()
     return stat
 
 
@@ -45,7 +84,7 @@ def airhockey_planning_bench(cp, planners):
 
 
 def airhockey_planning(options):
-    env = AirHockeyChallengeWrapper(env="3dof-hit", action_type="position-velocity",
+    env = AirHockeyChallengeWrapper(env="3dof-defend", action_type="position-velocity",
                                     interpolation_order=3, debug=False)
     agents = DummyAgent(env.env_info, 5)
     obs = env.reset()
@@ -99,9 +138,9 @@ def airhockey_planning(options):
     planners = options.planner.split(",")
     if options.bench:
         for i in range(0, 100):
-            airhockey_planning_once(cp, planners[0], options.output)
+            airhockey_planning_once(cp, planners[0], env, options.output, False)
     else:
-        airhockey_planning_once(cp, planners[0], options.output)
+        airhockey_planning_once(cp, planners[0], env, options.output, True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

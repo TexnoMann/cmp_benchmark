@@ -47,7 +47,7 @@ def addConstrainedOptions(parser):
     group.add_argument("-d", "--delta", type=float, default=ob.CONSTRAINED_STATE_SPACE_DELTA,
                     help="Step-size for discrete geodesic on manifold.")
     group.add_argument("--lambda", type=float, dest="lambda_", metavar="LAMBDA",
-                    default=ob.CONSTRAINED_STATE_SPACE_LAMBDA*2,
+                    default=ob.CONSTRAINED_STATE_SPACE_LAMBDA*1.5,
                     help="Maximum `wandering` allowed during atlas traversal. Must be greater "
                     "than 1.")
     group.add_argument("--tolerance", type=float, default=0.01,
@@ -225,13 +225,12 @@ class ConstrainedProblem(object):
         
         if output:
             if stat:
-                states = [[x[i] for i in range(self.css.getAmbientDimension())] for x in simplePath.getStates()]
+                states = [[x[i] for i in range(self.css.getAmbientDimension())] for x in path.getStates()]
                 deviation = calc_constraint_deviation(np.array(states), self.constraint)
+                self.out_path = np.array(states)
             else:
                 deviation = None
             self.results = pd.concat([self.results, pd.DataFrame({'std_deviation': [deviation], 'time': [self.ss.getLastPlanComputationTime()], 'succes': [1.0 if bool(stat) else 0.0]})])
-        print(self.results)
-
         return stat
 
     def setupBenchmark(self, planners, problem):
