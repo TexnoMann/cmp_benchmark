@@ -60,12 +60,6 @@ def addConstrainedOptions(parser):
                     help="Planner `range` value for planners that support this parameter. "
                     "Automatically determined otherwise (when 0).")
 
-def list2vec(l):
-    ret = ou.vectorDouble()
-    for e in l:
-        ret.append(e)
-    return ret
-
 def clearSpaceAndPlanner(planner):
     planner.getSpaceInformation().getStateSpace().clear()
     planner.clear()
@@ -255,11 +249,6 @@ class ConstrainedProblem(object):
 
         self.bench.setPreRunEvent(ot.PreSetupEvent(clearSpaceAndPlanner))
 
-    def runBenchmark(self):
-        self.bench.benchmark(self.request)
-        filename = str(datetime.datetime.now()) + '_' + \
-            self.bench.getExperimentName() + '_' + self.spaceType
-        self.bench.saveResultsToFile(filename)
 
     def atlasStats(self):
         # For atlas types, output information about size of atlas and amount of
@@ -269,16 +258,3 @@ class ConstrainedProblem(object):
             if self.spaceType == "AT":
                 ou.OMPL_INFORM("Atlas is approximately %.3f%% open" %
                             self.css.estimateFrontierPercent())
-
-    def dumpGraph(self, name):
-        ou.OMPL_INFORM("Dumping planner graph to `%s_graph.graphml`." % name)
-        data = ob.PlannerData(self.csi)
-        self.pp.getPlannerData(data)
-
-        with open("logs/%s_graph.graphml" % name, "w") as graphfile:
-            print(data.printGraphML(), file=graphfile)
-
-        if self.spaceType == "AT" or self.spaceType == "TB":
-            ou.OMPL_INFORM("Dumping atlas to `%s_atlas.ply`." % name)
-            with open("logs/%s_atlas.ply" % name, "w") as atlasfile:
-                print(self.css.printPLY(), file=atlasfile)

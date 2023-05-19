@@ -1,5 +1,4 @@
 from ompl import base as ob
-from ompl import geometric as og
 import numpy as np
 
 from scipy.interpolate import CubicSpline
