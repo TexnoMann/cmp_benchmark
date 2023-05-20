@@ -21,25 +21,35 @@ import os, sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.prepare_results import *
+from benchmark.benchmark_scene import BenchmarkConstrainedScene
+
+# Generate projection class instance from name
+def projector_factory(pj_classname: str, space: ob.StateSpace):
+    cls = globals()[pj_classname]
+    return cls()
 
 def addSpaceOption(parser):
     parser.add_argument("-s", "--space", default="PJ",
-                        choices=["PJ", "AT", "TB"],
-                        help="""Choose which constraint handling methodology to use. One of:
-        PJ - Projection (Default)
-        AT - Atlas
-        TB - Tangent Bundle.""")
+        choices=["PJ", "AT", "TB"],
+        help="""Choose which constraint_function handling methodology to use. 
+        One of:
+            PJ - Projection (Default)
+            AT - Atlas
+            TB - Tangent Bundle.
+        """
+    )
 
 
 def addPlannerOption(parser):
     parser.add_argument("-p", "--planner", default="RRTConnect",
-                        help="Comma-separated list of which motion planner to use (multiple if "
-                        "benchmarking, one if planning).\n Choose from, e.g.:\n"
-                        "RRT (Default), RRTConnect, RRTstar, "
-                        "EST, BiEST, ProjEST, "
-                        "BITstar, "
-                        "PRM, SPARS, "
-                        "KPIECE1, BKPIECE1.")
+        help="Comma-separated list of which motion planner to use.\n "
+        "Choose from, e.g.:\n"
+        "RRT (Default), RRTConnect, RRTstar, "
+        "EST, BiEST, ProjEST, "
+        "BITstar, "
+        "PRM, SPARS, "
+        "KPIECE1, BKPIECE1."
+    )
 
 
 def addConstrainedOptions(parser):
@@ -51,7 +61,7 @@ def addConstrainedOptions(parser):
                     help="Maximum `wandering` allowed during atlas traversal. Must be greater "
                     "than 1.")
     group.add_argument("--tolerance", type=float, default=0.01,
-                    help="Constraint satisfaction tolerance.")
+                    help="constraint_function satisfaction tolerance.")
     group.add_argument("--time", type=float, default=60.,
                     help="Planning time allowed.")
     group.add_argument("--tries", type=int, default=ob.CONSTRAINT_PROJECTION_MAX_ITERATIONS,
@@ -97,81 +107,83 @@ def addAtlasOptions(parser):
 
 class ConstrainedProblem(object):
 
-    def __init__(self, spaceType, space, constraint, options):
-        self.spaceType = spaceType
-        self.space = space
-        self.constraint = constraint
-        self.constraint.setTolerance(0.0075)
+    def __init__(self, planning_space_type: str, scene: BenchmarkConstrainedScene, options):
+        self.planning_space_type = planning_space_type
+        self.space = scene.space
+        self.constraint = scene.constraint
+        self.constraint.setTolerance(options.tolerance)
         self.constraint.setMaxIterations(options.tries)
+        self.validation_function = ob.StateValidityCheckerFn(scene.is_state_valid)
         self.options = options
         self.bench = None
         self.request = None
         self.pp = None
-        self.results = pd.DataFrame(columns=['std_deviation', 'time', 'succes'])
-        # self.results = pd.concat([self.results, pd.DataFrame({'deviation': [1]})])
-        print(self.results)
 
-        if spaceType == "PJ":
+        if planning_space_type == "PJ":
             ou.OMPL_INFORM("Using Projection-Based State Space!")
-            self.css = ob.ProjectedStateSpace(space, constraint)
+            self.css = ob.ProjectedStateSpace(self.space, self.constraint_function)
             self.csi = ob.ConstrainedSpaceInformation(self.css)
-        elif spaceType == "AT":
+        elif planning_space_type == "AT":
             ou.OMPL_INFORM("Using Atlas-Based State Space!")
-            self.css = ob.AtlasStateSpace(space, constraint)
+            self.css = ob.AtlasStateSpace(self.space, self.constraint_function)
             self.csi = ob.ConstrainedSpaceInformation(self.css)
-        elif spaceType == "TB":
+        elif planning_space_type == "TB":
             ou.OMPL_INFORM("Using Tangent Bundle-Based State Space!")
-            self.css = ob.TangentBundleStateSpace(space, constraint)
+            self.css = ob.TangentBundleStateSpace(self.space, self.constraint_function)
             self.csi = ob.TangentBundleSpaceInformation(self.css)
 
         self.css.setup()
         self.css.setDelta(options.delta)
         self.css.setLambda(options.lambda_)
-        if not spaceType == "PJ":
+        if not planning_space_type == "PJ":
             self.css.setExploration(options.exploration)
             self.css.setEpsilon(options.epsilon)
             self.css.setRho(options.rho)
             self.css.setAlpha(options.alpha)
             self.css.setMaxChartsPerExtension(options.charts)
             if options.bias:
-                self.css.setBiasFunction(lambda c, atlas=self.css:
-                                        atlas.getChartCount() - c.getNeighborCount() + 1.)
-            if spaceType == "AT":
+                self.css.setBiasFunction(lambda c, atlas=self.css: atlas.getChartCount() - c.getNeighborCount() + 1.)
+            if planning_space_type == "AT":
                 self.css.setSeparated(not options.no_separate)
             self.css.setup()
         self.ss = og.SimpleSetup(self.csi)
 
-    def setStartAndGoalStates(self, start, goal):
+    def set_start_and_goal(self, start, goal):
         # Create start and goal states
-        if self.spaceType == "AT" or self.spaceType == "TB":
+        if self.planning_space_type == "AT" or self.planning_space_type == "TB":
             self.css.anchorChart(start())
             self.css.anchorChart(goal())
 
         # Setup problem
         self.ss.setStartAndGoalStates(start, goal)
+        self.ss.setStateValidityChecker(ob.StateValidityCheckerFn(self.s))
 
-    def getPlanner(self, plannerName, projectionName=None):
-        planner = eval('og.%s(self.csi)' % plannerName)
+    def get_planner_by_name(self, planner_name: str):
+        planner = eval('og.%s(self.csi)' % planner_name)
         try:
             if self.options.range == 0:
-                if not self.spaceType == "PJ":
+                if not self.planning_space_type == "PJ":
                     planner.setRange(self.css.getRho_s())
             else:
                 planner.setRange(self.options.range)
         except:
             pass
         try:
-            if projectionName:
-                planner.setProjectionEvaluator(projectionName)
+            if self.planning_space_type == "PJ":
+                try:
+                    self.projection_evaluator = projector_factory(self.options.projector_method)
+                    planner.setProjectionEvaluator(self.projection_evaluator)
+                except:
+                    ou.OMPL_WARN("Cannot get projectory evaluator with name: {}".format(self.options.projector_method))
         except:
             pass
         return planner
 
-    def setPlanner(self, plannerName, projectionName=None):
-        self.pp = self.getPlanner(plannerName, projectionName)
+    def set_planner(self, planner_name: str):
+        self.pp = self.get_planner_by_name(planner_name)
         self.ss.setPlanner(self.pp)
 
-    def solveOnce(self, output=True, name="ompl"):
+    def solve_once(self, output=True, name="ompl"):
         self.ss.setup()
         stat = self.ss.solve(self.options.time)
         if stat:
@@ -226,51 +238,23 @@ class ConstrainedProblem(object):
         if output:
             if stat:
                 states = [[x[i] for i in range(self.css.getAmbientDimension())] for x in path.getStates()]
-                deviation = calc_constraint_deviation(np.array(states), self.constraint)
+                deviation = calc_constraint_deviation(np.array(states), self.constraint_function)
                 self.out_path = np.array(states)
             else:
                 deviation = None
             self.results = pd.concat([self.results, pd.DataFrame({'std_deviation': [deviation], 'time': [self.ss.getLastPlanComputationTime()], 'succes': [1.0 if bool(stat) else 0.0]})])
         return stat
 
-    def setupBenchmark(self, planners, problem):
-        self.bench = ot.Benchmark(self.ss, problem)
-
-        self.bench.addExperimentParameter(
-            "n", "INTEGER", str(self.constraint.getAmbientDimension()))
-        self.bench.addExperimentParameter(
-            "k", "INTEGER", str(self.constraint.getManifoldDimension()))
-        self.bench.addExperimentParameter(
-            "n - k", "INTEGER", str(self.constraint.getCoDimension()))
-        self.bench.addExperimentParameter("space", "INTEGER", self.spaceType)
-
-        self.request = ot.Benchmark.Request()
-        self.request.maxTime = self.options.time
-        self.request.maxMem = 1e9
-        self.request.runCount = 3
-        self.request.timeBetweenUpdates = 0.1
-        self.request.saveConsoleOutput = False
-        for planner in planners:
-            self.bench.addPlanner(self.getPlanner(planner, problem))
-
-        self.bench.setPreRunEvent(ot.PreSetupEvent(clearSpaceAndPlanner))
-
-    def runBenchmark(self):
-        self.bench.benchmark(self.request)
-        filename = str(datetime.datetime.now()) + '_' + \
-            self.bench.getExperimentName() + '_' + self.spaceType
-        self.bench.saveResultsToFile(filename)
-
-    def atlasStats(self):
+    def atlas_stats(self):
         # For atlas types, output information about size of atlas and amount of
         # space explored
-        if self.spaceType == "AT" or self.spaceType == "TB":
+        if self.planning_space_type == "AT" or self.planning_space_type == "TB":
             ou.OMPL_INFORM("Atlas has %d charts" % self.css.getChartCount())
-            if self.spaceType == "AT":
+            if self.planning_space_type == "AT":
                 ou.OMPL_INFORM("Atlas is approximately %.3f%% open" %
                             self.css.estimateFrontierPercent())
 
-    def dumpGraph(self, name):
+    def dump_graph(self, name):
         ou.OMPL_INFORM("Dumping planner graph to `%s_graph.graphml`." % name)
         data = ob.PlannerData(self.csi)
         self.pp.getPlannerData(data)
@@ -278,7 +262,10 @@ class ConstrainedProblem(object):
         with open("logs/%s_graph.graphml" % name, "w") as graphfile:
             print(data.printGraphML(), file=graphfile)
 
-        if self.spaceType == "AT" or self.spaceType == "TB":
+        if self.planning_space_type == "AT" or self.planning_space_type == "TB":
             ou.OMPL_INFORM("Dumping atlas to `%s_atlas.ply`." % name)
             with open("logs/%s_atlas.ply" % name, "w") as atlasfile:
                 print(self.css.printPLY(), file=atlasfile)
+    
+    def get_path_metrics(self):
+        pass

@@ -8,15 +8,6 @@ import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from benchmark.benchmark import *
-import mujoco
-from agents.dummy import DummyAgent
-
-from tasks.air_hockey_challenge.air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
-from tasks.air_hockey_challenge.air_hockey_challenge.framework import AgentBase
-from tasks.air_hockey_challenge.air_hockey_challenge.utils.kinematics import forward_kinematics, inverse_kinematics, jacobian, link_to_xml_name
-
-from constraints.airhockey_ompl_constraint import AirHockeyCircleConstraint
-
 
 
 def airhockey_planning_once(cp, plannername, env, output, play=False):
@@ -40,41 +31,7 @@ def airhockey_planning_once(cp, plannername, env, output, play=False):
     if output:
         cp.dumpGraph("airhockey")
 
-    if stat:
-        current_ee_pose = forward_kinematics(
-            env_info['robot']['robot_model'],
-            env_info['robot']['robot_data'],
-            cp.out_path[0,:]
-        )[0]
-
-        out_path = np.zeros(cp.out_path.shape)
-        for i in range(cp.out_path.shape[0]):
-            ee_pose = forward_kinematics(
-                env_info['robot']['robot_model'],
-                env_info['robot']['robot_data'],
-                cp.out_path[i,:]
-            )[0]
-            out_path[i,:] = ee_pose
-        t = np.arange(0, 2*np.pi, 0.05)
-        x = np.reshape(np.cos(t)*0.1 + current_ee_pose[0]+0.1, (-1,1))
-        y = np.reshape(np.sin(t)*0.1+ current_ee_pose[1],(-1,1))
-        if play:
-            plot_path(out_path, np.concatenate([x,y], axis=1))
-
-        steps = -1
-        if play:
-            while True:
-                steps += 1
-                t_start = time.time()
-                if ((steps-1)/cp.out_path.shape[0])%2 == 0:
-                    action = np.flip(cp.out_path, axis=0)[(steps-1)%cp.out_path.shape[0],:]
-                else:
-                    action = cp.out_path[(steps-1)%cp.out_path.shape[0],:]
-                
-                joints_pose_vel = np.vstack([action,np.zeros(action.shape)])
-                obs, reward, done, info = env.step(joints_pose_vel)
-
-                env.render()
+    
     return stat
 
 
