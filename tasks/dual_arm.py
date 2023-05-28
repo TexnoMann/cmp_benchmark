@@ -74,23 +74,23 @@ class DualArmConstraint(ob.Constraint):
         self.function(q, out)
         return np.linalg.norm(out)
 
-    # def project(self, projection):
-    #     i = 0
-    #     q = np.zeros(self.getAmbientDimension())
-    #     ompl2numpy(projection, q)
-    #     x = np.zeros(self.getCoDimension())
-    #     J = np.zeros((self.getCoDimension(), self.getAmbientDimension()))
-    #     self.function(q, x)
-    #     # print(self.getTolerance())
-    #     while x.dot(x)>= self.getTolerance()**2:
-    #         if i > self.getMaxIterations():
-    #             return False
-    #         self.jacobian(q, J)
-    #         q = q - np.linalg.pinv(J)@x
-    #         self.function(q, x)
-    #         i+=1
-    #     numpy2ompl(q, projection)
-    #     return True
+    def project(self, projection):
+        i = 0
+        q = np.zeros(self.getAmbientDimension())
+        ompl2numpy(projection, q)
+        x = np.zeros(self.getCoDimension())
+        J = np.zeros((self.getCoDimension(), self.getAmbientDimension()))
+        self.function(q, x)
+        # print(self.getTolerance())
+        while x.dot(x)>= self.getTolerance()**2:
+            if i > self.getMaxIterations():
+                return False
+            self.jacobian(q, J)
+            q = q - np.linalg.pinv(J)@x
+            self.function(q, x)
+            i+=1
+        numpy2ompl(q, projection)
+        return True
 
     @property
     def target_tf(self):

@@ -26,8 +26,8 @@ from utils.prepare_results import *
 from benchmark.benchmark_scene import BenchmarkConstrainedScene, list2vec, ompl2numpy,numpy2ompl, NewtonRaphsonProjectionEvaluator
 
 def addSpaceOption(parser):
-    parser.add_argument("-s", "--space", default="PJ",
-        choices=["PJ", "AT", "TB"],
+    parser.add_argument("-s", "--space", default=["PJ"],
+        choices=["PJ", "AT", "TB"], nargs="+",
         help="""Choose which constraint_function handling methodology to use. 
         One of:
             PJ - Projection (Default)
@@ -42,10 +42,12 @@ def addInputOutputOption(parser):
     )
 
 def addPlannerOption(parser):
-    parser.add_argument("-p", "--planner", default="RRTConnect",
-        help="Comma-separated list of which motion planner to use.\n "
+    parser.add_argument("-p", "--planner", default=["RRTConnect"],
+        choices=["RRT", "RRTConnect", "RRTstar", "EST", "BiEST", "ProjEST", "BITstar", "PRM", "KPIECE1", "BKPIECE1"],
+        nargs="+",
+        help="List of which motion planner to use.\n "
         "Choose from, e.g.:\n"
-        "RRT (Default), RRTConnect, RRTstar, "
+        "RRT, RRTConnect (Default), RRTstar, "
         "EST, BiEST, ProjEST, "
         "BITstar, "
         "PRM, SPARS, "
@@ -63,7 +65,7 @@ def addConstrainedOptions(parser):
                     "than 1.")
     group.add_argument("--tolerance", type=float, default=0.05,
                     help="constraint_function satisfaction tolerance.")
-    group.add_argument("--time", type=float, default=600.,
+    group.add_argument("--time", type=float, default=100.,
                     help="Planning time allowed.")
     group.add_argument("--projector_method", type=str, default="NewtonRaphsonProjection",
                     help="Projection method.")
@@ -206,19 +208,19 @@ class ConstrainedProblem(object):
             if not simplePath.check():
                 ou.OMPL_WARN("Simplified path fails check!")
                 ok = False
-            end_time = time.time()
 
-            ou.OMPL_INFORM("Interpolating simplified path...")
-            simplePath.interpolate(1000)
+            # ou.OMPL_INFORM("Interpolating simplified path...")
+            # simplePath.interpolate(1000)
 
-            if not simplePath.check():
-                ou.OMPL_WARN("Interpolated simplified path fails check!")
-                simplePath = path
+            # if not simplePath.check():
+            #     ou.OMPL_WARN("Interpolated simplified path fails check!")
+            #     simplePath = path
                 
         else:
             ou.OMPL_WARN("No solution found.")
-
-        if ok:
+        
+        end_time = time.time()
+        if ok and stat:
             states = [[x[i] for i in range(self.__css.getAmbientDimension())] for x in simplePath.getStates()]
             states_array = np.asarray(states)
             deviation = calc_constraint_deviation(states_array, self.__constraint)

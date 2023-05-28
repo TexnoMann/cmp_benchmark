@@ -24,11 +24,13 @@ def planning_once_by_planner(problem: ConstrainedProblem, planner_name: str, sta
 
 
 def evaluate_planning(options):
-    spaces = options.space.split(",")
-    planners = options.planner.split(",")
-
+    opt_vars = vars(options)
+    print(opt_vars)
+    spaces = options.space
+    planners = options.planner
     over_spaces_benchmark_results = {}
     for s in spaces:
+        print("START PLAN WITH {} SPACE".format(s))
         scene = DualArmScene('tasks/models/urdf/ur5e_pybullet.urdf', 'tasks/models/urdf/ur5e_pybullet.urdf')
         cp = ConstrainedProblem(s, scene, options)
 
@@ -39,12 +41,12 @@ def evaluate_planning(options):
         q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf)
 
         planning_results =  pd.DataFrame(columns = ["ok", "exec_time", "deviation"])
-        for i in range(0, 1):
+        for i in range(0, 10):
             result = planning_once_by_planner(cp, planners[0], q_start, q_end)
             planning_results.loc[i] = [result['ok'], result['exec_time'], result['deviation']]
             print("EVALUATE ITERATION {}".format(i))
         over_spaces_benchmark_results[s] = planning_results
-        with open('dual_arm_{}_{}.pickle'.format(options.output, s), 'wb') as handle:
+        with open('dual_arm_{}_.pickle'.format(options.output, planners[0]), 'wb') as handle:
             pickle.dump(over_spaces_benchmark_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 

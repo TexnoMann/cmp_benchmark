@@ -27,13 +27,13 @@ class AirhockeyConstraint(ob.Constraint):
         self.__sim = sim
         self.__robot_name = robot_name
         self.__robot = self.__sim.get_robot(self.__robot_name)
-        self.__codim = 2
+        self.__codim = 3
 
         self.__ambient_dim = self.__robot.num_joints
         self.__q = np.zeros(self.__ambient_dim)
 
         self.__plate_pose = plate_pose
-        self.__selection_matrix = np.array([[1, 0, 0], [0, 1, 0]])
+        self.__selection_matrix_R = np.array([[1, 0, 0], [0, 1, 0]])
 
         self.__plate_normal = plate_normal/np.linalg.norm(plate_normal)
         self.__plate_orto_tf_x = np.cross(plate_normal, np.array([1,0,0]))
@@ -54,7 +54,7 @@ class AirhockeyConstraint(ob.Constraint):
         stick_tf = self.__robot.ee_state("tool_stick").tf
         pose = stick_tf.t
         displacement_pose = self.__plate_normal.dot(self.__plate_pose - pose)
-        displacement_rotation = self.__selection_matrix @ self.__plate_virtual_orient.T@(SE3(SO3(stick_tf.R,check=False)) @ SE3(SO3(self.__plate_virtual_orient, check=False)).inv()).twist().A
+        displacement_rotation = self.__selection_matrix_R @ self.__plate_virtual_orient.T@(SE3(SO3(stick_tf.R,check=False)) @ SE3(SO3(self.__plate_virtual_orient, check=False)).inv()).twist().A
         displacement = np.concatenate([displacement_pose, displacement_rotation], axis=0)
         numpy2ompl(displacement, out)
 
