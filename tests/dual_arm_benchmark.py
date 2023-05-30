@@ -16,7 +16,7 @@ import pickle
 from tasks.dual_arm import DualArmScene
 
 N_RAND_INIT_Q = 100
-N_PLAN_ITER = 1
+N_PLAN_ITER = 20
 ALGORITHM_NAMES = {'PJ': 'CBiRRT', 'TB': 'TBRRT', 'AT': 'AtlasRRT'}
 
 def planning_once_by_planner(problem: ConstrainedProblem, planner_name: str, start_near_constraint: np.ndarray, goal_near_constraint: np.ndarray):
