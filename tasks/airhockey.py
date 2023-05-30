@@ -106,12 +106,13 @@ class AirhockeyScene(BenchmarkConstrainedScene):
     def __init__(self, urdf_filename_robot1: str, table_link_name: str):
         self.__sim = PyBulletWorld(gui_mode = GUI_MODE.SIMPLE_GUI)
         self.__sim.add_object('airhockey_table', 'tasks/models/urdf/airhockey_table.urdf', fixed =True, save=True)
-        self.__robot = self.__sim.add_robot(urdf_filename_robot1, SE3(-1.5,0,0.55), 'robot1')
+        self.__robot = self.__sim.add_robot(urdf_filename_robot1, SE3(-1.5,0,0.52), 'robot1')
         self.__striker_link = 'iiwa_1/striker_mallet_tip'
         # self.__sim.sim_step()
 
         self.__state_space = ob.RealVectorStateSpace(self.__robot.num_joints)     
         bounds = ob.RealVectorBounds(self.__robot.num_joints)
+        print(self.__robot.joint_limits.limit_positions)
         lb = self.__robot.joint_limits.limit_positions[0]
         ub = self.__robot.joint_limits.limit_positions[1]
         for i in range(self.__robot.num_joints):
@@ -133,14 +134,13 @@ class AirhockeyScene(BenchmarkConstrainedScene):
         initial_q: np.ndarray = None
     ):  
         if not initial_q is None:
-            q1 = initial_q[:self.__robot.num_joints]
+            q1 = initial_q
             self.__robot.reset_joint_state(JointState.from_position(q1))
-        time.sleep(10)
+        # time.sleep(10)
         self.__robot.reset_ee_state(EEState.from_tf(tf_robot, self.__target_state.ee_link, self.__target_state.ref_frame))
         q1 = self.__robot.joint_state.joint_positions
         new_q = np.copy(q1)
         self.__constraint.project(new_q)
-        time.sleep(10)
         return new_q
     
     def get_workspace_from_configuration( self, initial_q: np.ndarray) -> EEState:
@@ -156,6 +156,9 @@ class AirhockeyScene(BenchmarkConstrainedScene):
         q1 = q
         self.__robot.reset_joint_state(JointState.from_position(q1))
         if len(self.__sim.is_collide_with('robot1'))>0:
+            return False
+        striker_pose = self.__robot.ee_state(self.__target_state.ee_link).tf.t
+        if striker_pose[0]<-1.6 or striker_pose[1]>0.65 or striker_pose[1]<-0.65:
             return False
         return True
         

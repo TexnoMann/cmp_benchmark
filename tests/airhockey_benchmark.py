@@ -35,10 +35,10 @@ def evaluate_planning(options):
 
     benchmark_results = pd.DataFrame(columns = ["algorithm", "planner", "exec_time", "ok", "deviation"])
 
-    random_init_q = np.random.uniform(-np.pi+0.0001, np.pi-0.0001, (N_RAND_INIT_Q, 12))
-    random_end_q = np.random.uniform(-np.pi+0.0001, np.pi-0.0001, (N_RAND_INIT_Q, 12))
-    start_robot1_ee_tf = SE3(-0.6, -0.15, 0.8) @ SE3.Rx(np.pi/2)@SE3.Ry(np.pi/8)
-    end_robot1_ee_tf = SE3(-0.1, 0.1, 1.4) @ SE3.Rx(np.pi/2)
+    random_init_q = np.random.uniform(-np.pi+0.001, np.pi-0.001, (N_RAND_INIT_Q, 9))
+    random_end_q = np.random.uniform(-np.pi+0.001, np.pi-0.001, (N_RAND_INIT_Q, 9))
+    start_robot1_ee_tf = SE3(0.2, 0.1, 0.0) @ SE3.Rx(np.pi)
+    end_robot1_ee_tf = SE3(1.2, 0.0, 0.0) @ SE3.Rx(np.pi)
     
     for s in spaces:
         print("START PLAN WITH {} SPACE".format(s))
@@ -50,7 +50,9 @@ def evaluate_planning(options):
                 break
             for k in range(0, N_RAND_INIT_Q):
                 q_start = scene.get_constrained_configuration_from_workspace(start_robot1_ee_tf, random_init_q[j,:])
+                # time.sleep(10)
                 q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf, random_end_q[k,:])
+                # time.sleep(10)
                 if not (scene.is_q_valid(q_start) and scene.is_q_valid(q_end)):
                     continue
                 for i in range(0, N_PLAN_ITER):

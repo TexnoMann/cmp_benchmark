@@ -35,8 +35,8 @@ def evaluate_planning(options):
 
     benchmark_results = pd.DataFrame(columns = ["algorithm", "planner", "exec_time", "ok", "deviation"])
 
-    random_init_q = np.random.uniform(-np.pi+0.0001, np.pi-0.0001, (N_RAND_INIT_Q, 12))
-    random_end_q = np.random.uniform(-np.pi+0.0001, np.pi-0.0001, (N_RAND_INIT_Q, 12))
+    random_init_q = np.random.uniform(-np.pi+0.001, np.pi-0.001, (N_RAND_INIT_Q, 12))
+    random_end_q = np.random.uniform(-np.pi+0.001, np.pi-0.001, (N_RAND_INIT_Q, 12))
 
     start_robot1_ee_tf = SE3(-0.6, -0.15, 0.8) @ SE3.Rx(np.pi/2)@SE3.Ry(np.pi/8)
     end_robot1_ee_tf = SE3(-0.1, 0.1, 1.4) @ SE3.Rx(np.pi/2)
@@ -70,8 +70,12 @@ def evaluate_planning(options):
         pickle.dump(benchmark_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--bench", action="store_true",
+                        help="Do benchmarking on provided planner list.")
     addSpaceOption(parser)
     addPlannerOption(parser)
     addConstrainedOptions(parser)
