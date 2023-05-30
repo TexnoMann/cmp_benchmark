@@ -17,13 +17,13 @@ services:
       - QT_X11_NO_MITSHM=1
     networks:
       - general
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
     ipc: host
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw

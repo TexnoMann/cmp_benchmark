@@ -106,7 +106,7 @@ class DualArmConstraint(ob.Constraint):
 
 class DualArmScene(BenchmarkConstrainedScene):
     def __init__(self, urdf_filename_robot1: str, urdf_filename_robot2: str):
-        self.__sim = PyBulletWorld(gui_mode = GUI_MODE.SIMPLE_GUI, time_step = 0.0000001)
+        self.__sim = PyBulletWorld(gui_mode = GUI_MODE.DIRECT, time_step = 0.00000001)
         self.__sim.add_object('table', 'tasks/models/urdf/table.urdf', fixed =True, save=True)
         self.__sim.add_object('block', 'tasks/models/urdf/block.urdf', fixed =True, save=True, base_transform=SE3(-0.65, 0.0, 0.95))
         self.__robot = self.__sim.add_robot(urdf_filename_robot1, SE3(0,-0.3,0.655), 'robot1')
