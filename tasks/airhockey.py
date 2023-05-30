@@ -22,8 +22,24 @@ from itmobotics_sim.pybullet_env.pybullet_world import PyBulletWorld, GUI_MODE
 from itmobotics_sim.pybullet_env.pybullet_robot import PyBulletRobot
 from itmobotics_sim.utils.controllers import EEPositionToEEVelocityController, EEVelocityToJointVelocityController, JointTorquesController
 
+def create_tf_for_plane(center: np.ndarray, normal: np.ndarray):
+    plate_normal = normal/np.linalg.norm(normal)
+    plate_orto_tf_x = np.cross(plate_normal, np.array([1,0,0]))
+    plate_orto_tf_y = np.cross(plate_normal, plate_orto_tf_x)
+    plate_virtual_tf = SE3(
+        np.concatenate(
+            [
+                np.concatenate([np.atleast_2d(plate_orto_tf_x).T, np.array([[0.0]])], axis=0),
+                np.concatenate([np.atleast_2d(plate_orto_tf_y).T, np.array([[0.0]])], axis=0),
+                np.concatenate([np.atleast_2d(plate_normal).T, np.array([[0.0]])], axis=0),
+                np.concatenate([np.atleast_2d(center).T, np.array([[1.0]])], axis=0)
+            ], axis=1
+        ), check=False
+    )
+    return plate_virtual_tf
+
 class AirhockeyConstraint(ob.Constraint):
-    def __init__(self, sim: PyBulletWorld, robot_name: str, stick_link_name: str, plate_pose: np.ndarray, plate_normal: np.ndarray):
+    def __init__(self, sim: PyBulletWorld, robot_name: str, stick_link_name: str, plane_pose: np.ndarray, plane_normal: np.ndarray):
         self.__sim = sim
         self.__robot_name = robot_name
         self.__robot = self.__sim.get_robot(self.__robot_name)
@@ -32,18 +48,9 @@ class AirhockeyConstraint(ob.Constraint):
         self.__ambient_dim = self.__robot.num_joints
         self.__q = np.zeros(self.__ambient_dim)
 
-        self.__plate_pose = plate_pose
-        self.__selection_matrix_R = np.array([[1, 0, 0], [0, 1, 0]])
+        self.__selection_matrix_in_plate_basis = np.array([[0, 0, 1, 0, 0, 0],[0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 1, 0]])
 
-        self.__plate_normal = plate_normal/np.linalg.norm(plate_normal)
-        self.__plate_orto_tf_x = np.cross(plate_normal, np.array([1,0,0]))
-        self.__plate_orto_tf_y = np.cross(plate_normal, self.__plate_orto_tf_x)
-        self.__plate_virtual_orient = np.concatenate(
-            [   np.atleast_2d(self.__plate_orto_tf_x).T,
-                np.atleast_2d(self.__plate_orto_tf_y).T,
-                np.atleast_2d(self.__plate_normal).T
-            ], axis=1
-        )
+        self.__plane_virtual_tf = create_tf_for_plane(plane_pose, plane_normal)
 
         super(AirhockeyConstraint, self).__init__(self.__ambient_dim, self.__codim)
 
@@ -52,10 +59,9 @@ class AirhockeyConstraint(ob.Constraint):
         q1 = self.__q
         self.__robot.reset_joint_state(JointState.from_position(q1))
         stick_tf = self.__robot.ee_state("tool_stick").tf
-        pose = stick_tf.t
-        displacement_pose = self.__plate_normal.dot(self.__plate_pose - pose)
-        displacement_rotation = self.__selection_matrix_R @ self.__plate_virtual_orient.T@(SE3(SO3(stick_tf.R,check=False)) @ SE3(SO3(self.__plate_virtual_orient, check=False)).inv()).twist().A
-        displacement = np.concatenate([displacement_pose, displacement_rotation], axis=0)
+        tool_tf_in_plate_basis = self.__plane_virtual_tf.inv()@stick_tf
+        displacement = self.__selection_matrix_in_plate_basis@tool_tf_in_plate_basis.twist().A
+        
         numpy2ompl(displacement, out)
 
     def jacobian(self, state, out):
@@ -63,8 +69,8 @@ class AirhockeyConstraint(ob.Constraint):
         q1 = self.__q
         self.__robot.reset_joint_state(JointState.from_position(q1))
         J1 = self.__robot.jacobian(q1, "tool_stick")
-        Rblock = np.kron(np.eye(2,dtype=float), self.__plate_virtual_orient.T)
-        Jc = Rblock @ J1
+        Rblock = np.kron(np.eye(2,dtype=float),self.__plane_virtual_tf.R.T)
+        Jc = self.__selection_matrix_in_plate_basis @(Rblock @ J1)
         for i in range(0, Jc.shape[0]):
             for j in range(0, Jc.shape[1]):
                 out[i, j] = Jc[i, j]

@@ -190,9 +190,17 @@ class ConstrainedProblem(object):
         stat = self.__ss.solve(self.options.time)
         if stat:
             # Get solution and validate
-            path = self.__ss.getSolutionPath()
+            try:
+                # Prevent PRM error
+                time.sleep(1)
+                path = self.__ss.getSolutionPath()
+            except:
+                stat = False
+        end_time = time.time()
+        if stat:
             if not path.check():
                 ou.OMPL_WARN("Path fails check!")
+                ok = False
 
             if stat == ob.PlannerStatus.APPROXIMATE_SOLUTION:
                 ou.OMPL_WARN("Solution is approximate.")
@@ -207,26 +215,27 @@ class ConstrainedProblem(object):
 
             if not simplePath.check():
                 ou.OMPL_WARN("Simplified path fails check!")
-                ok = False
 
-            # ou.OMPL_INFORM("Interpolating simplified path...")
-            # simplePath.interpolate(1000)
+            ou.OMPL_INFORM("Interpolating simplified path...")
+            simplePath.interpolate(1000)
 
-            # if not simplePath.check():
-            #     ou.OMPL_WARN("Interpolated simplified path fails check!")
-            #     simplePath = path
+            if not simplePath.check():
+                ou.OMPL_WARN("Interpolated simplified path fails check!")
+                simplePath = path
+
+            ou.OMPL_INFORM("Inerpolated Path Contain: %d points"%(simplePath.getStateCount()))
                 
         else:
             ou.OMPL_WARN("No solution found.")
+            ok=False
         
-        end_time = time.time()
         if ok and stat:
             states = [[x[i] for i in range(self.__css.getAmbientDimension())] for x in simplePath.getStates()]
             states_array = np.asarray(states)
             deviation = calc_constraint_deviation(states_array, self.__constraint)
-            return {"path": states_array, "deviation": deviation, "exec_time": (end_time-start_time), "ok": int(ok)}
+            return {"path": states_array, "deviation": deviation, "exec_time": (end_time-start_time), "ok": int(ok), "init_ok": stat}
         
-        return {"exec_time": (end_time-start_time), "ok": int(ok), "deviation": None}
+        return {"exec_time": (end_time-start_time), "ok": int(ok), "deviation": None, "init_ok": stat}
 
     def atlas_stats(self):
         # For atlas types, output information about size of atlas and amount of
