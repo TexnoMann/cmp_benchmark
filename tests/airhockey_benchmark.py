@@ -1,5 +1,6 @@
 from __future__ import print_function
 import argparse
+import pandas as pd
 import math
 import time
 import numpy as np
@@ -8,108 +9,72 @@ import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from benchmark.benchmark import *
+from spatialmath import SE3
+from itmobotics_sim.utils.robot import EEState
+import pickle
 
+from tasks.airhockey import AirhockeyScene
 
-def airhockey_planning_once(cp, plannername, env, output, play=False):
-    env_info = env.env_info
+N_RAND_INIT_Q = 100
+N_PLAN_ITER = 20
+ALGORITHM_NAMES = {'PJ': 'CBiRRT', 'TB': 'TBRRT', 'AT': 'AtlasRRT'}
 
-    cp.setPlanner(plannername, "airhockey")
-
+def planning_once_by_planner(problem: ConstrainedProblem, planner_name: str, start_near_constraint: np.ndarray, goal_near_constraint: np.ndarray):
+    problem.set_planner(planner_name)
+    problem.set_start_and_goal(start_near_constraint, goal_near_constraint)
     # Solve the problem
-    stat = cp.solveOnce(output, "airhockey")
-
-    if output:
-        ou.OMPL_INFORM("Dumping problem information to `airhockey_info.txt`.")
-        with open("logs/airhockey_info.txt", "w") as infofile:
-            print(cp.spaceType, file=infofile)
-    
-    if output:
-        ou.OMPL_INFORM("Dumping planning quality criterios `airhockey_criterios.txt`.")
-        print(cp.results.mean(axis = 0, skipna=True))
-
-    cp.atlasStats()
-    if output:
-        cp.dumpGraph("airhockey")
-
-    
+    stat = problem.solve_once("dual_arm")
     return stat
 
 
-def airhockey_planning_bench(cp, planners):
-    cp.setupBenchmark(planners, "airhockey")
-    cp.runBenchmark()
+def evaluate_planning(options):
+    opt_vars = vars(options)
+    print(opt_vars)
+    spaces = options.space
+    planners = options.planner
 
+    benchmark_results = pd.DataFrame(columns = ["algorithm", "planner", "exec_time", "ok", "deviation"])
 
-def airhockey_planning(options):
-    env = AirHockeyChallengeWrapper(env="3dof-defend", action_type="position-velocity",
-                                    interpolation_order=3, debug=False)
-    agents = DummyAgent(env.env_info, 5)
-    obs = env.reset()
-    agents.episode_start()
-
-    # Calculate current and finish position for circle constraint
-    qs = agents.get_joint_pos(obs)
-    current_ee_pose = forward_kinematics(
-        env.env_info['robot']['robot_model'],
-        env.env_info['robot']['robot_data'],
-        qs
-    )
-    qf_res, qf = inverse_kinematics(
-        env.env_info['robot']['robot_model'],
-        env.env_info['robot']['robot_data'],
-        current_ee_pose[0] + np.array([0.2, 0, 0]), initial_q=qs
-    )
-    print(qs, qf)
-    if not qf_res:
-        raise("Cannot solve inverse kinematic problem for end point")
+    random_init_q = np.random.uniform(-np.pi+0.0001, np.pi-0.0001, (N_RAND_INIT_Q, 12))
+    random_end_q = np.random.uniform(-np.pi+0.0001, np.pi-0.0001, (N_RAND_INIT_Q, 12))
+    start_robot1_ee_tf = SE3(-0.6, -0.15, 0.8) @ SE3.Rx(np.pi/2)@SE3.Ry(np.pi/8)
+    end_robot1_ee_tf = SE3(-0.1, 0.1, 1.4) @ SE3.Rx(np.pi/2)
     
-    # Create the ambient space state space for the problem.
-    rvss = ob.RealVectorStateSpace(env.env_info['robot']['n_joints'])     
-    bounds = ob.RealVectorBounds(env.env_info['robot']['n_joints'])
-    lb = env.env_info['robot']['joint_pos_limit'][0,:]
-    ub = env.env_info['robot']['joint_pos_limit'][1,:]
-    for i in range(env.env_info['robot']['n_joints']):
-        bounds.setLow(i, lb[i])
-        bounds.setHigh(i, ub[i])
-    rvss.setBounds(bounds)
+    for s in spaces:
+        print("START PLAN WITH {} SPACE".format(s))
+        q_ok = False
+        scene = AirhockeyScene('tasks/models/urdf/iiwa_airhockey.urdf', "iiwa_1/link_0")
+        cp = ConstrainedProblem(s, scene, options)
+        for j in range(0, N_RAND_INIT_Q):
+            if q_ok:
+                break
+            for k in range(0, N_RAND_INIT_Q):
+                q_start = scene.get_constrained_configuration_from_workspace(start_robot1_ee_tf, random_init_q[j,:])
+                q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf, random_end_q[k,:])
+                if not (scene.is_q_valid(q_start) and scene.is_q_valid(q_end)):
+                    continue
+                for i in range(0, N_PLAN_ITER):
+                    print("EVALUATE ITERATION {}".format(i))
+                    # time.sleep(10)
+                    for p in planners:
+                        result = planning_once_by_planner(cp, p, q_start, q_end)
+                        group_out_result = [ALGORITHM_NAMES[s], p, result['exec_time'], result['ok'], result['deviation']]
+                        print("Write to dataframe planning info: {}".format(group_out_result))
+                        benchmark_results.loc[len(benchmark_results.index)] = group_out_result
+                q_ok = True
+                break
+        del scene, cp
 
-    # Create our constraint.
-    constraint = AirHockeyCircleConstraint(
-        env.env_info['robot']['n_joints'],
-        env.env_info['robot']['robot_model'],
-        env.env_info['robot']['robot_data'],
-        current_ee_pose[0] + np.array([0.1, 0, 0]), 0.1
-    )
+    with open('airhockey_{}_e{}_d{}.pickle'.format(options.output, options.epsilon, options.delta, planners[0]), 'wb') as handle:
+        pickle.dump(benchmark_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    cp = ConstrainedProblem(options.space, rvss, constraint, options)
-
-    cp.ss.clear()
-    start = ob.State(cp.css)
-    goal = ob.State(cp.css)
-    for i in range(env.env_info['robot']['n_joints']):
-        start[i] = qs[i]
-        goal[i] = qf[i]
-    cp.setStartAndGoalStates(start, goal)
-    # cp.ss.setStateValidityChecker(ob.StateValidityCheckerFn(obstacles))
-
-    planners = options.planner.split(",")
-    if options.bench:
-        for i in range(0, 100):
-            airhockey_planning_once(cp, planners[0], env, options.output, False)
-    else:
-        airhockey_planning_once(cp, planners[0], env, options.output, True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-o", "--output", action="store_true",
-                        help="Dump found solution path (if one exists) in plain text and planning "
-                        "graph in GraphML to `airhockey_path.txt` and `airhockey_graph.graphml` "
-                        "respectively.")
-    parser.add_argument("--bench", action="store_true",
-                        help="Do benchmarking on provided planner list.")
     addSpaceOption(parser)
     addPlannerOption(parser)
     addConstrainedOptions(parser)
     addAtlasOptions(parser)
+    addInputOutputOption(parser)
 
-    airhockey_planning(parser.parse_args())
+    evaluate_planning(parser.parse_args())

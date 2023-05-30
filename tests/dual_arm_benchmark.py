@@ -72,8 +72,6 @@ def evaluate_planning(options):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--bench", action="store_true",
-                        help="Do benchmarking on provided planner list.")
     addSpaceOption(parser)
     addPlannerOption(parser)
     addConstrainedOptions(parser)

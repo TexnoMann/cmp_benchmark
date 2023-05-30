@@ -215,6 +215,8 @@ class ConstrainedProblem(object):
 
             if not simplePath.check():
                 ou.OMPL_WARN("Simplified path fails check!")
+            else:
+                ok = True
 
             ou.OMPL_INFORM("Interpolating simplified path...")
             simplePath.interpolate(1000)
@@ -222,6 +224,8 @@ class ConstrainedProblem(object):
             if not simplePath.check():
                 ou.OMPL_WARN("Interpolated simplified path fails check!")
                 simplePath = path
+            else:
+                ok = True
 
             ou.OMPL_INFORM("Inerpolated Path Contain: %d points"%(simplePath.getStateCount()))
                 

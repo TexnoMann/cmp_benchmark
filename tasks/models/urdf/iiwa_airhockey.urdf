@@ -31,11 +31,11 @@
   <material name="LightGrey">
     <color rgba="0.3 0.3 0.3 1.0"/>
   </material>
-  <link name="world"/>
+  <link name="base_link"/>
   <!--joint between {parent} and link_0-->
   <joint name="iiwa_1/base_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 0"/>
-    <parent link="world"/>
+    <parent link="base_link"/>
     <child link="iiwa_1/link_0"/>
   </joint>
   <link name="iiwa_1/link_0">
@@ -209,7 +209,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/collision/link_4.stl"/>
+        <mesh filename="meshes/iiwa_airhockey/collision/link_4.stl"/>
       </geometry>
       <material name="Orange"/>
     </collision>
