@@ -60,7 +60,7 @@ class DualArmConstraint(ob.Constraint):
         self.__robot.reset_joint_state(JointState.from_position(q1))
         self.__robot2.reset_joint_state(JointState.from_position(q2))
         robot2_tf = self.__robot2.ee_state(self.__target_tf.ref_frame, "world").tf
-        
+        self.__sim.sim_step()
         J1 = self.__robot.jacobian(q1, self.__target_tf.ee_link, "world")
         J2 = self.__robot2.jacobian(q2, self.__target_tf.ref_frame, "world")
         Rblock = np.kron(np.eye(2,dtype=float), robot2_tf.R.T)
@@ -81,12 +81,19 @@ class DualArmConstraint(ob.Constraint):
         x = np.zeros(self.getCoDimension())
         J = np.zeros((self.getCoDimension(), self.getAmbientDimension()))
         self.function(q, x)
-        # print(self.getTolerance())
         while x.dot(x)>= self.getTolerance()**2:
             if i > self.getMaxIterations():
                 return False
             self.jacobian(q, J)
             q = q - np.linalg.pinv(J)@x
+            q1 = q[:self.__robot.num_joints]
+            q2 = q[self.__robot.num_joints:]
+            self.__robot.reset_joint_state(JointState.from_position(q1))
+            self.__robot2.reset_joint_state(JointState.from_position(q2))
+            if len(self.__sim.is_collide_with('robot1'))>0:
+                return False
+            if len(self.__sim.is_collide_with('robot2'))>0:
+                return False
             self.function(q, x)
             i+=1
         numpy2ompl(q, projection)
@@ -99,8 +106,9 @@ class DualArmConstraint(ob.Constraint):
 
 class DualArmScene(BenchmarkConstrainedScene):
     def __init__(self, urdf_filename_robot1: str, urdf_filename_robot2: str):
-        self.__sim = PyBulletWorld(gui_mode = GUI_MODE.DIRECT, time_step = 0.01)
+        self.__sim = PyBulletWorld(gui_mode = GUI_MODE.SIMPLE_GUI, time_step = 0.0000001)
         self.__sim.add_object('table', 'tasks/models/urdf/table.urdf', fixed =True, save=True)
+        self.__sim.add_object('block', 'tasks/models/urdf/block.urdf', fixed =True, save=True, base_transform=SE3(-0.65, 0.0, 0.95))
         self.__robot = self.__sim.add_robot(urdf_filename_robot1, SE3(0,-0.3,0.655), 'robot1')
         self.__robot2 = self.__sim.add_robot(urdf_filename_robot2, SE3(0.0,0.3,0.655), 'robot2')
 
@@ -161,6 +169,9 @@ class DualArmScene(BenchmarkConstrainedScene):
         if len(self.__sim.is_collide_with('robot1'))>0:
             return False
         if len(self.__sim.is_collide_with('robot2'))>0:
+            return False
+        object_pose = self.__robot.ee_state("tool0").tf.t
+        if object_pose[2]<0.65:
             return False
         return True
         

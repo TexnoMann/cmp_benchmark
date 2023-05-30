@@ -16,7 +16,7 @@ import pickle
 from tasks.dual_arm import DualArmScene
 
 N_RAND_INIT_Q = 100
-N_PLAN_ITER = 20
+N_PLAN_ITER = 1
 ALGORITHM_NAMES = {'PJ': 'CBiRRT', 'TB': 'TBRRT', 'AT': 'AtlasRRT'}
 
 def planning_once_by_planner(problem: ConstrainedProblem, planner_name: str, start_near_constraint: np.ndarray, goal_near_constraint: np.ndarray):
@@ -38,34 +38,30 @@ def evaluate_planning(options):
     random_init_q = np.random.uniform(-np.pi+0.001, np.pi-0.001, (N_RAND_INIT_Q, 12))
     random_end_q = np.random.uniform(-np.pi+0.001, np.pi-0.001, (N_RAND_INIT_Q, 12))
 
-    start_robot1_ee_tf = SE3(-0.6, -0.15, 0.8) @ SE3.Rx(np.pi/2)@SE3.Ry(np.pi/8)
-    end_robot1_ee_tf = SE3(-0.1, 0.1, 1.4) @ SE3.Rx(np.pi/2)
+    start_robot1_ee_tf = SE3(-0.6, -0.15, 0.8) @ SE3.Rx(np.pi/2)
+    end_robot1_ee_tf = SE3(-0.7, -0.0, 1.15) @ SE3.Rx(np.pi/2)
     
-    for s in spaces:
-        print("START PLAN WITH {} SPACE".format(s))
-        q_ok = False
-        scene = DualArmScene('tasks/models/urdf/ur5e_pybullet.urdf', 'tasks/models/urdf/ur5e_pybullet.urdf')
-        cp = ConstrainedProblem(s, scene, options)
-        for j in range(0, N_RAND_INIT_Q):
-            if q_ok:
-                break
-            for k in range(0, N_RAND_INIT_Q):
-                q_start = scene.get_constrained_configuration_from_workspace(start_robot1_ee_tf, random_init_q[j,:])
-                q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf, random_end_q[k,:])
-                if not (scene.is_q_valid(q_start) and scene.is_q_valid(q_end)):
-                    continue
-                for i in range(0, N_PLAN_ITER):
-                    print("EVALUATE ITERATION {}".format(i))
-                    # time.sleep(10)
-                    for p in planners:
-                        result = planning_once_by_planner(cp, p, q_start, q_end)
-                        group_out_result = [ALGORITHM_NAMES[s], p, result['exec_time'], result['ok'], result['deviation']]
-                        print("Write to dataframe planning info: {}".format(group_out_result))
-                        benchmark_results.loc[len(benchmark_results.index)] = group_out_result
-                q_ok = True
-                break
-        del scene, cp
-
+    scene = DualArmScene('tasks/models/urdf/ur5e_pybullet.urdf', 'tasks/models/urdf/ur5e_pybullet.urdf')
+    for j in range(0, N_RAND_INIT_Q):
+        q_start = scene.get_constrained_configuration_from_workspace(start_robot1_ee_tf, random_init_q[j,:])
+        # time.sleep(10)
+        q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf, random_init_q[j,:])
+        if not (scene.is_q_valid(q_start) and scene.is_q_valid(q_end)):
+            continue
+        for s in spaces:
+            print("START PLAN WITH {} SPACE".format(s))
+            cp = ConstrainedProblem(s, scene, options)
+            for i in range(0, N_PLAN_ITER):
+                print("EVALUATE ITERATION {}".format(i))
+                # time.sleep(10)
+                for p in planners:
+                    result = planning_once_by_planner(cp, p, q_start, q_end)
+                    group_out_result = [ALGORITHM_NAMES[s], p, result['exec_time'], result['ok'], result['deviation']]
+                    print("Write to dataframe planning info: {}".format(group_out_result))
+                    benchmark_results.loc[len(benchmark_results.index)] = group_out_result
+            del cp
+        break
+    del scene
     with open('dual_arm_{}_e{}_d{}.pickle'.format(options.output, options.epsilon, options.delta, planners[0]), 'wb') as handle:
         pickle.dump(benchmark_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 

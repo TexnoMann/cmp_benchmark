@@ -104,7 +104,7 @@ class AirhockeyConstraint(ob.Constraint):
 
 class AirhockeyScene(BenchmarkConstrainedScene):
     def __init__(self, urdf_filename_robot1: str, table_link_name: str):
-        self.__sim = PyBulletWorld(gui_mode = GUI_MODE.SIMPLE_GUI)
+        self.__sim = PyBulletWorld(gui_mode = GUI_MODE.SIMPLE_GUI, time_step = 0.0000001)
         self.__sim.add_object('airhockey_table', 'tasks/models/urdf/airhockey_table.urdf', fixed =True, save=True)
         self.__robot = self.__sim.add_robot(urdf_filename_robot1, SE3(-1.5,0,0.52), 'robot1')
         self.__striker_link = 'iiwa_1/striker_mallet_tip'
