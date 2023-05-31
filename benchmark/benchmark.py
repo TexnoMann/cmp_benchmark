@@ -63,8 +63,6 @@ def addConstrainedOptions(parser):
                     default=ob.CONSTRAINED_STATE_SPACE_LAMBDA,
                     help="Maximum `wandering` allowed during atlas traversal. Must be greater "
                     "than 1.")
-    group.add_argument("--tolerance", type=float, default=0.05,
-                    help="constraint_function satisfaction tolerance.")
     group.add_argument("--time", type=float, default=100.,
                     help="Planning time allowed.")
     group.add_argument("--projector_method", type=str, default="NewtonRaphsonProjection",
@@ -110,7 +108,7 @@ class ConstrainedProblem(object):
         self.__planning_space_type = planning_space_type
         self.__space = scene.state_space
         self.__constraint = scene.constraint
-        self.__constraint.setTolerance(options.tolerance)
+        self.__constraint.setTolerance(options.epsilon)
         self.__constraint.setMaxIterations(options.tries)
         self.__validation_function = ob.StateValidityCheckerFn(scene.is_state_valid)
         self.options = options
