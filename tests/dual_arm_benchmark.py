@@ -62,9 +62,12 @@ def evaluate_planning(options):
             del cp
         break
     del scene
-    with open('dual_arm_{}_e{}_d{}.pickle'.format(options.output, options.epsilon, options.delta, planners[0]), 'wb') as handle:
-        pickle.dump(benchmark_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+    file_name = 'dual_arm_{}_e{}_d{}.pickle'.format(options.output, options.epsilon, options.delta, planners[0])
+    with open(file_name, 'wb') as handle:
+        pickle.dump(benchmark_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        print("WRITING RESULT INTO: {}".format(file_name))
+    time.sleep(4)
 
 
 

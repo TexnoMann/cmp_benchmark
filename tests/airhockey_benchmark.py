@@ -62,8 +62,11 @@ def evaluate_planning(options):
         break
     del scene
 
-    with open('airhockey_{}_e{}_d{}.pickle'.format(options.output, options.epsilon, options.delta, planners[0]), 'wb') as handle:
+    file_name = 'airhockey_{}_e{}_d{}.pickle'.format(options.output, options.epsilon, options.delta, planners[0])
+    with open(file_name, 'wb') as handle:
         pickle.dump(benchmark_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        print("WRITING RESULT INTO: {}".format(file_name))
+    time.sleep(4)
 
 
 if __name__ == "__main__":

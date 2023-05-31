@@ -101,7 +101,7 @@ def main():
     if args.field == 'ok':
         plot_succes_rate_comparison(data_plan, "", args.field)
     else:
-        plot_field_comparison(data_plan, "", args.field, args.ylabel, [27, 62])
+        plot_field_comparison(data_plan, "", args.field, args.ylabel)
 
         
         
