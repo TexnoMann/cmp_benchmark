@@ -64,7 +64,7 @@ def evaluate_planning(options):
 
     file_name = 'airhockey_{}_e{}_d{}.pickle'.format(options.output, options.epsilon, options.delta, planners[0])
     with open(file_name, 'wb') as handle:
-        pickle.dump(benchmark_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump({"result": benchmark_results, "options": options}, handle, protocol=pickle.HIGHEST_PROTOCOL)
         print("WRITING RESULT INTO: {}".format(file_name))
     time.sleep(4)
 
