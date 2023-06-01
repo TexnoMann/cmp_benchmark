@@ -35,17 +35,19 @@ def evaluate_planning(options):
 
     benchmark_results = pd.DataFrame(columns = ["algorithm", "planner", "exec_time", "ok", "deviation"])
 
-    random_init_q = np.random.uniform(-np.pi+0.001, np.pi-0.001, (N_RAND_INIT_Q, 12))
-    random_end_q = np.random.uniform(-np.pi+0.001, np.pi-0.001, (N_RAND_INIT_Q, 12))
+    base_pose = np.array([0.0, -np.pi/2, 0.0, -np.pi/2, 0.0, 0.0])
 
-    start_robot1_ee_tf = SE3(-0.6, -0.15, 0.8) @ SE3.Rx(np.pi/2)
-    end_robot1_ee_tf = SE3(-0.7, -0.0, 1.15) @ SE3.Rx(np.pi/2)
+    random_init_q = np.random.uniform(-0.1, 0.1, (N_RAND_INIT_Q, 12)) + np.concatenate([base_pose, base_pose], axis=0)
+
+    start_robot1_ee_tf = SE3(-0.6, -0.15, 0.7) @ SE3.Rx(np.pi/2)
+    end_robot1_ee_tf = SE3(0.4, -0.0, 1.0) @ SE3.Rx(np.pi/2)
     
-    scene = DualArmScene('tasks/models/urdf/ur5e_pybullet.urdf', 'tasks/models/urdf/ur5e_pybullet.urdf')
+    scene = DualArmScene('tasks/models/urdf/ur5e_pybullet.urdf', 'tasks/models/urdf/ur5e_pybullet2.urdf')
     for j in range(0, N_RAND_INIT_Q):
         q_start = scene.get_constrained_configuration_from_workspace(start_robot1_ee_tf, random_init_q[j,:])
-        # time.sleep(10)
-        q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf, random_init_q[j,:])
+        time.sleep(5)
+        q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf, q_start)
+        time.sleep(5)
         if not (scene.is_q_valid(q_start) and scene.is_q_valid(q_end)):
             continue
         for s in spaces:

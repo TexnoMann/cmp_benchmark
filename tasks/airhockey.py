@@ -96,6 +96,24 @@ class AirhockeyConstraint(ob.Constraint):
             i+=1
         numpy2ompl(q, projection)
         return True
+    
+    def project(self, projection):
+        i = 0
+        q = np.zeros(self.getAmbientDimension())
+        ompl2numpy(projection, q)
+        x = np.zeros(self.getCoDimension())
+        J = np.zeros((self.getCoDimension(), self.getAmbientDimension()))
+        self.function(q, x)
+        # print(self.getTolerance())
+        while x.dot(x)>= self.getTolerance()**2:
+            if i > self.getMaxIterations():
+                return False
+            self.jacobian(q, J)
+            q = q - np.linalg.pinv(J)@x
+            self.function(q, x)
+            i+=1
+        numpy2ompl(q, projection)
+        return True
 
     @property
     def target_plane_tf(self):
@@ -104,15 +122,14 @@ class AirhockeyConstraint(ob.Constraint):
 
 class AirhockeyScene(BenchmarkConstrainedScene):
     def __init__(self, urdf_filename_robot1: str, table_link_name: str):
-        self.__sim = PyBulletWorld(gui_mode = GUI_MODE.DIRECT, time_step = 0.00000001)
+        self.__sim = PyBulletWorld(gui_mode = GUI_MODE.SIMPLE_GUI, time_step = 0.00000001)
         self.__sim.add_object('airhockey_table', 'tasks/models/urdf/airhockey_table.urdf', fixed =True, save=True)
-        self.__robot = self.__sim.add_robot(urdf_filename_robot1, SE3(-1.5,0,0.52), 'robot1')
+        self.__robot = self.__sim.add_robot(urdf_filename_robot1, SE3(-1.3,0, 0.00), 'robot1')
         self.__striker_link = 'iiwa_1/striker_mallet_tip'
         # self.__sim.sim_step()
 
         self.__state_space = ob.RealVectorStateSpace(self.__robot.num_joints)     
         bounds = ob.RealVectorBounds(self.__robot.num_joints)
-        print(self.__robot.joint_limits.limit_positions)
         lb = self.__robot.joint_limits.limit_positions[0]
         ub = self.__robot.joint_limits.limit_positions[1]
         for i in range(self.__robot.num_joints):
@@ -136,8 +153,8 @@ class AirhockeyScene(BenchmarkConstrainedScene):
         if not initial_q is None:
             q1 = initial_q
             self.__robot.reset_joint_state(JointState.from_position(q1))
-        # time.sleep(10)
         self.__robot.reset_ee_state(EEState.from_tf(tf_robot, self.__target_state.ee_link, self.__target_state.ref_frame))
+        # time.sleep(10)
         q1 = self.__robot.joint_state.joint_positions
         new_q = np.copy(q1)
         self.__constraint.project(new_q)
@@ -158,7 +175,8 @@ class AirhockeyScene(BenchmarkConstrainedScene):
         if len(self.__sim.is_collide_with('robot1'))>0:
             return False
         striker_pose = self.__robot.ee_state(self.__target_state.ee_link).tf.t
-        if striker_pose[0]<-1.6 or striker_pose[1]>0.65 or striker_pose[1]<-0.65:
+        # print(striker_pose)
+        if striker_pose[0]<-1 or striker_pose[1]>0.55 or striker_pose[1]<-0.55:
             return False
         return True
         

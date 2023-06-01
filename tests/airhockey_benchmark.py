@@ -15,7 +15,7 @@ import pickle
 
 from tasks.airhockey import AirhockeyScene
 
-N_RAND_INIT_Q = 100
+N_RAND_INIT_Q = 10000
 N_PLAN_ITER = 20
 ALGORITHM_NAMES = {'PJ': 'CBiRRT', 'TB': 'TBRRT', 'AT': 'AtlasRRT'}
 
@@ -35,18 +35,20 @@ def evaluate_planning(options):
 
     benchmark_results = pd.DataFrame(columns = ["algorithm", "planner", "exec_time", "ok", "deviation"])
 
-    random_init_q = np.random.uniform(-np.pi+0.001, np.pi-0.001, (N_RAND_INIT_Q, 9))
-    random_end_q = np.random.uniform(-np.pi+0.001, np.pi-0.001, (N_RAND_INIT_Q, 9))
-    start_robot1_ee_tf = SE3(0.2, 0.1, 0.0) @ SE3.Rx(np.pi)
+    random_init_q = np.random.uniform(-0.1, 0.1, (N_RAND_INIT_Q, 9))
+    start_robot1_ee_tf = SE3(0.5, 0.4, 0.0) @ SE3.Rx(np.pi)
     end_robot1_ee_tf = SE3(1.2, 0.0, 0.0) @ SE3.Rx(np.pi)
 
     scene = AirhockeyScene('tasks/models/urdf/iiwa_airhockey.urdf', "iiwa_1/link_0")
     for j in range(0, N_RAND_INIT_Q):
         q_start = scene.get_constrained_configuration_from_workspace(start_robot1_ee_tf, random_init_q[j,:])
-        # time.sleep(10)
-        q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf, random_init_q[j,:])
+        print(q_start)
+        # time.sleep(5)
+        q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf, q_start)
         if not (scene.is_q_valid(q_start) and scene.is_q_valid(q_end)):
             continue
+        print(q_end)
+        # time.sleep(5)
         for s in spaces:
             print("START PLAN WITH {} SPACE".format(s))
             cp = ConstrainedProblem(s, scene, options)

@@ -17,14 +17,14 @@ parser.add_argument("-yl", "--ylabel", type=str, required=True,
 FONT_SIZE=16
 FIGSIZE=(10,9)
 
-def plot_field_comparison(data, title: str, field: str, y_label: str, skip_in_y: list = None):
+def plot_field_comparison(data, title: str, field: str, y_label: str, y_max: float = 100, skip_in_y: list = None):
     field_data = data
 
     if not skip_in_y is None:
         f, (ax_top, ax_bottom) = plt.subplots(ncols=1, nrows=2, sharex=True, gridspec_kw={'hspace':0.1}, figsize=FIGSIZE)
-        sns.boxplot(data=field_data, x='algorithm',y=field,hue="planner", ax=ax_top)
-        sns.boxplot(data=field_data, x='algorithm',y=field,hue="planner", ax=ax_bottom)
-        ax_top.set_ylim(skip_in_y[1],160)
+        sns.boxplot(data=field_data, x='algorithm',y=field,hue="planner", ax=ax_top, showfliers = False)
+        sns.boxplot(data=field_data, x='algorithm',y=field,hue="planner", ax=ax_bottom, showfliers = False)
+        ax_top.set_ylim(skip_in_y[1],y_max)
         ax_top.set_title(title, fontsize=FONT_SIZE)
         ax_bottom.set_ylim(0,skip_in_y[0])
         sns.despine(ax=ax_bottom)
@@ -60,7 +60,7 @@ def plot_field_comparison(data, title: str, field: str, y_label: str, skip_in_y:
         
     else:
         f = plt.figure(figsize=FIGSIZE)
-        ax = sns.boxplot(data=field_data, x='algorithm',y=field, hue="planner")
+        ax = sns.boxplot(data=field_data, x='algorithm',y=field, hue="planner", showfliers = False)
         plt.grid(axis='x')
         plt.grid(axis='y')
         plt.title(title, fontsize=FONT_SIZE)
@@ -97,11 +97,11 @@ def main():
     print("Opening: {}".format(args.input))
     with open(args.input, 'rb') as file:
         data_plan = pickle.load(file)
-        print(data_plan)
+        print(data_plan["options"])
     if args.field == 'ok':
-        plot_succes_rate_comparison(data_plan, "", args.field)
+        plot_succes_rate_comparison(data_plan["result"], "", args.field)
     else:
-        plot_field_comparison(data_plan, "", args.field, args.ylabel)
+        plot_field_comparison(data_plan["result"], "", args.field, args.ylabel, 40, [1.7, 2])
 
         
         

@@ -21,12 +21,12 @@
         <color rgba="1 0.6 0 1"/>
       </material>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin rpy="3.14159265359 0 0" xyz="-0.0225 0.0225 0"/>
       <geometry>
 	 	    <mesh filename="meshes/peg/peg_round.STL" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
   </link>
   <link name="peg_target_link">
     <inertial>
