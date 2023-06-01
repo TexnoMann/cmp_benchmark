@@ -23,16 +23,14 @@ from itmobotics_sim.pybullet_env.pybullet_robot import PyBulletRobot
 from itmobotics_sim.utils.controllers import EEPositionToEEVelocityController, EEVelocityToJointVelocityController, JointTorquesController
 
 class DualArmConstraint(ob.Constraint):
-    def __init__(self, sim: PyBulletWorld, robot_name1: str, robot_name2: str, target_tf: EEState, use_transpose_J = False):
-        self.__sim = sim
+    def __init__(self, sim: PyBulletWorld, robot_name1: str, robot_name2: str, target_tf: EEState):
+        self.sim = sim
         self.__robot_name1 = robot_name1
         self.__robot_name2 = robot_name2
         self.__target_tf = target_tf
-        self.__robot = self.__sim.get_robot(robot_name1)
-        self.__robot2 = self.__sim.get_robot(robot_name2)
+        self.__robot = self.sim.get_robot(robot_name1)
+        self.__robot2 = self.sim.get_robot(robot_name2)
         self.__codim = 6
-
-        self.__use_transpose_J = use_transpose_J
 
         self.__ambient_dim = self.__robot.num_joints + self.__robot2.num_joints
         self.__q = np.zeros(self.__ambient_dim)
@@ -46,7 +44,7 @@ class DualArmConstraint(ob.Constraint):
         self.__robot.reset_joint_state(JointState.from_position(q1))
         self.__robot2.reset_joint_state(JointState.from_position(q2))
 
-        tf_btw_ee_in_ee2_frame = self.__sim.link_state(
+        tf_btw_ee_in_ee2_frame = self.sim.link_state(
             self.__robot_name1,
             self.__target_tf.ee_link,
             self.__robot_name2,
@@ -62,7 +60,7 @@ class DualArmConstraint(ob.Constraint):
         self.__robot.reset_joint_state(JointState.from_position(q1))
         self.__robot2.reset_joint_state(JointState.from_position(q2))
         robot2_tf = self.__robot2.ee_state(self.__target_tf.ref_frame, "world").tf
-        self.__sim.sim_step()
+        self.sim.sim_step()
         J1 = self.__robot.jacobian(q1, self.__target_tf.ee_link, "world")
         J2 = self.__robot2.jacobian(q2, self.__target_tf.ref_frame, "world")
         Rblock = np.kron(np.eye(2,dtype=float), robot2_tf.R.T)
@@ -86,18 +84,16 @@ class DualArmConstraint(ob.Constraint):
         while x.dot(x)>= self.getTolerance()**2:
             if i > self.getMaxIterations():
                 return False
+            self.sim.sim_step()
             self.jacobian(q, J)
-            if self.__use_transpose_J:
-                q = q - J.T@x
-            else:
-                q = q - np.linalg.pinv(J)@x
+            q = q - np.linalg.pinv(J)@x
             q1 = q[:self.__robot.num_joints]
             q2 = q[self.__robot.num_joints:]
             self.__robot.reset_joint_state(JointState.from_position(q1))
             self.__robot2.reset_joint_state(JointState.from_position(q2))
-            if len(self.__sim.is_collide_with('robot1'))>0:
+            if len(self.sim.is_collide_with('robot1'))>0:
                 return False
-            if len(self.__sim.is_collide_with('robot2'))>0:
+            if len(self.sim.is_collide_with('robot2'))>0:
                 return False
             self.function(q, x)
             i+=1
@@ -111,14 +107,14 @@ class DualArmConstraint(ob.Constraint):
 
 class DualArmScene(BenchmarkConstrainedScene):
     def __init__(self, urdf_filename_robot1: str, urdf_filename_robot2: str):
-        self.__sim = PyBulletWorld(gui_mode = GUI_MODE.SIMPLE_GUI, time_step = 0.00000001)
-        self.__sim.add_object('table', 'tasks/models/urdf/table.urdf', fixed =True, save=True)
-        # self.__sim.add_object('block', 'tasks/models/urdf/block.urdf', fixed =True, save=True, base_transform=SE3(-0.6, 0.0, 1.0))
-        self.__robot = self.__sim.add_robot(urdf_filename_robot1, SE3(0,-0.3,0.655), 'robot1')
-        self.__robot2 = self.__sim.add_robot(urdf_filename_robot2, SE3(0.0,0.3,0.655), 'robot2')
+        self.sim = PyBulletWorld(gui_mode = GUI_MODE.SIMPLE_GUI, time_step = 0.00000001)
+        self.sim.add_object('table', 'tasks/models/urdf/table.urdf', fixed =True, save=True)
+        # self.sim.add_object('block', 'tasks/models/urdf/block.urdf', fixed =True, save=True, base_transform=SE3(-0.6, 0.0, 1.0))
+        self.__robot = self.sim.add_robot(urdf_filename_robot1, SE3(0,-0.5,0.655), 'robot1')
+        self.__robot2 = self.sim.add_robot(urdf_filename_robot2, SE3(0.0,0.5,0.655), 'robot2')
 
         # self.__robot.connect_tool('peg' ,'tasks/models/urdf/peg_round.urdf', root_link='ee_tool', tf=SE3(0.0, 0.0, 0.1))
-        self.__sim.sim_step()
+        self.sim.sim_step()
 
         self.__state_space = ob.RealVectorStateSpace(self.__robot.num_joints + self.__robot2.num_joints)     
         bounds = ob.RealVectorBounds(self.__robot.num_joints + self.__robot2.num_joints)
@@ -130,7 +126,7 @@ class DualArmScene(BenchmarkConstrainedScene):
         self.__state_space.setBounds(bounds)
 
         self.__constraint = DualArmConstraint(
-            self.__sim,
+            self.sim,
             'robot1',
             'robot2',
             EEState.from_tf(SE3(0.0, 0.0, 0.15)@SE3.Ry(np.pi),"tool0", "tool0")
@@ -171,10 +167,10 @@ class DualArmScene(BenchmarkConstrainedScene):
         q2 = q[self.__robot.num_joints:]
         self.__robot.reset_joint_state(JointState.from_position(q1))
         self.__robot2.reset_joint_state(JointState.from_position(q2))
-        # print(self.__sim.is_collide_with('robot1'), self.__sim.is_collide_with('robot2'))
-        if len(self.__sim.is_collide_with('robot1'))>0:
+        # print(self.sim.is_collide_with('robot1'), self.sim.is_collide_with('robot2'))
+        if len(self.sim.is_collide_with('robot1'))>0:
             return False
-        if len(self.__sim.is_collide_with('robot2'))>0:
+        if len(self.sim.is_collide_with('robot2'))>0:
             return False
         object_pose = self.__robot.ee_state("tool0").tf.t
         if object_pose[2]<0.65:

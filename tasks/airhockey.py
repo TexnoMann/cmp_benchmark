@@ -40,9 +40,9 @@ def create_tf_for_plane(center: np.ndarray, normal: np.ndarray):
 
 class AirhockeyConstraint(ob.Constraint):
     def __init__(self, sim: PyBulletWorld, robot_name: str, target_plane_state: EEState):
-        self.__sim = sim
+        self.sim = sim
         self.__robot_name = robot_name
-        self.__robot = self.__sim.get_robot(self.__robot_name)
+        self.__robot = self.sim.get_robot(self.__robot_name)
         self.__codim = 3
 
         self.__ambient_dim = self.__robot.num_joints
@@ -90,6 +90,7 @@ class AirhockeyConstraint(ob.Constraint):
         while x.dot(x)>= self.getTolerance()**2:
             if i > self.getMaxIterations():
                 return False
+            self.sim.sim_step()
             self.jacobian(q, J)
             q = q - np.linalg.pinv(J)@x
             self.function(q, x)
@@ -122,11 +123,11 @@ class AirhockeyConstraint(ob.Constraint):
 
 class AirhockeyScene(BenchmarkConstrainedScene):
     def __init__(self, urdf_filename_robot1: str, table_link_name: str):
-        self.__sim = PyBulletWorld(gui_mode = GUI_MODE.SIMPLE_GUI, time_step = 0.00000001)
-        self.__sim.add_object('airhockey_table', 'tasks/models/urdf/airhockey_table.urdf', fixed =True, save=True)
-        self.__robot = self.__sim.add_robot(urdf_filename_robot1, SE3(-1.3,0, 0.00), 'robot1')
+        self.sim = PyBulletWorld(gui_mode = GUI_MODE.SIMPLE_GUI, time_step = 0.00000001, time_scale=1)
+        self.sim.add_object('airhockey_table', 'tasks/models/urdf/airhockey_table.urdf', fixed =True, save=True)
+        self.__robot = self.sim.add_robot(urdf_filename_robot1, SE3(-1.3,0, 0.00), 'robot1')
         self.__striker_link = 'iiwa_1/striker_mallet_tip'
-        # self.__sim.sim_step()
+        # self.sim.sim_step()
 
         self.__state_space = ob.RealVectorStateSpace(self.__robot.num_joints)     
         bounds = ob.RealVectorBounds(self.__robot.num_joints)
@@ -140,7 +141,7 @@ class AirhockeyScene(BenchmarkConstrainedScene):
         self.__target_state = EEState.from_tf(SE3.Rx(np.pi), self.__striker_link, table_link_name)
 
         self.__constraint = AirhockeyConstraint(
-            self.__sim,
+            self.sim,
             'robot1',
             self.__target_state
         )
@@ -172,7 +173,7 @@ class AirhockeyScene(BenchmarkConstrainedScene):
     def is_q_valid(self, q) -> bool:
         q1 = q
         self.__robot.reset_joint_state(JointState.from_position(q1))
-        if len(self.__sim.is_collide_with('robot1'))>0:
+        if len(self.sim.is_collide_with('robot1'))>0:
             return False
         striker_pose = self.__robot.ee_state(self.__target_state.ee_link).tf.t
         # print(striker_pose)

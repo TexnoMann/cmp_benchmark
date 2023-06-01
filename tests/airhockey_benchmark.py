@@ -40,6 +40,7 @@ def evaluate_planning(options):
     end_robot1_ee_tf = SE3(1.2, 0.0, 0.0) @ SE3.Rx(np.pi)
 
     scene = AirhockeyScene('tasks/models/urdf/iiwa_airhockey.urdf', "iiwa_1/link_0")
+    scene.sim.registrate_blender_objects()
     for j in range(0, N_RAND_INIT_Q):
         q_start = scene.get_constrained_configuration_from_workspace(start_robot1_ee_tf, random_init_q[j,:])
         print(q_start)
@@ -47,6 +48,8 @@ def evaluate_planning(options):
         q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf, q_start)
         if not (scene.is_q_valid(q_start) and scene.is_q_valid(q_end)):
             continue
+        scene.sim.sim_step()
+        scene.sim.save_blender_date('airhockey_scene.pkl')
         print(q_end)
         # time.sleep(5)
         for s in spaces:
