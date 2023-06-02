@@ -11,22 +11,26 @@ parser.add_argument("-in", "--input", type=str, required=True,
                     help="Input pickle file for ploting graph")
 parser.add_argument("-f", "--field", type=str, required=True,
                     help="Field for comparison")
-parser.add_argument("-yl", "--ylabel", type=str, required=True,
+parser.add_argument("-y", "--ylabel", type=str, required=True,
                     help="Label for y axis")
+parser.add_argument("-yl", "--ylim", type=lambda s: [float(item) for item in s.split(',')],
+                    help="Label for y axis")
+parser.add_argument("-wz", "--white_zone", type=lambda s: [float(item) for item in s.split(',')],
+                    help="White zone that should be split graph on two")
 
-FONT_SIZE=16
-FIGSIZE=(10,9)
+FONT_SIZE=24
+FIGSIZE=(12,10)
 
-def plot_field_comparison(data, title: str, field: str, y_label: str, y_max: float = 100, skip_in_y: list = None):
+def plot_field_comparison(data, title: str, field: str, y_label: str, ylims: list = [0, 100], skip_in_y: list = None):
     field_data = data
 
     if not skip_in_y is None:
         f, (ax_top, ax_bottom) = plt.subplots(ncols=1, nrows=2, sharex=True, gridspec_kw={'hspace':0.1}, figsize=FIGSIZE)
         sns.boxplot(data=field_data, x='algorithm',y=field,hue="planner", ax=ax_top, showfliers = False)
         sns.boxplot(data=field_data, x='algorithm',y=field,hue="planner", ax=ax_bottom, showfliers = False)
-        ax_top.set_ylim(skip_in_y[1],y_max)
+        ax_top.set_ylim(skip_in_y[1],ylims[1])
         ax_top.set_title(title, fontsize=FONT_SIZE)
-        ax_bottom.set_ylim(0,skip_in_y[0])
+        ax_bottom.set_ylim(ylims[0],skip_in_y[0])
         sns.despine(ax=ax_bottom)
         sns.despine(ax=ax_top, bottom=True)
         ax = ax_top
@@ -72,7 +76,9 @@ def plot_field_comparison(data, title: str, field: str, y_label: str, y_max: flo
         ax.set_ylabel(y_label, fontsize=FONT_SIZE)
         ax.xaxis.set_tick_params(labelsize=FONT_SIZE)
         ax.yaxis.set_tick_params(labelsize=FONT_SIZE)
+    print(data.groupby(['algorithm', 'planner'])['exec_time'].mean())
     plt.show()
+    
 
 
 def plot_succes_rate_comparison(data, title: str, field: str):
@@ -90,18 +96,20 @@ def plot_succes_rate_comparison(data, title: str, field: str):
     ax.set_ylabel("Успешность планирования, %", fontsize=FONT_SIZE)
     ax.xaxis.set_tick_params(labelsize=FONT_SIZE)
     ax.yaxis.set_tick_params(labelsize=FONT_SIZE)
+    print(data.groupby(['algorithm', 'planner'])['ok'].mean())
     plt.show()
 
 def main():
     args = parser.parse_args()
     print("Opening: {}".format(args.input))
+    print(args.ylim)
     with open(args.input, 'rb') as file:
         data_plan = pickle.load(file)
         print(data_plan["options"])
     if args.field == 'ok':
         plot_succes_rate_comparison(data_plan["result"], "", args.field)
     else:
-        plot_field_comparison(data_plan["result"], "", args.field, args.ylabel, 40, [1.7, 2])
+        plot_field_comparison(data_plan["result"], "", args.field, args.ylabel, args.ylim, args.white_zone)
 
         
         

@@ -39,17 +39,18 @@ def evaluate_planning(options):
 
     random_init_q = np.random.uniform(-0.1, 0.1, (N_RAND_INIT_Q, 12)) + np.concatenate([base_pose, base_pose], axis=0)
 
-    start_robot1_ee_tf = SE3(-0.5, -0.1, 0.7) @ SE3.Rx(np.pi/2)
-    end_robot1_ee_tf = SE3(0.4, -0.0, 0.8) @ SE3.Rx(np.pi/2)
+    start_robot1_ee_tf = SE3(-0.6, -0.1, 0.7) @ SE3.Rx(np.pi/2)
+    # end_robot1_ee_tf = SE3(0.4, -0.0, 0.8) @ SE3.Rx(np.pi/2)
+    end_robot1_ee_tf = SE3(-0.1, 0.1, 0.9) @ SE3.Rx(np.pi/2)
     
     scene = DualArmScene('tasks/models/urdf/ur5e_pybullet.urdf', 'tasks/models/urdf/ur5e_pybullet2.urdf')
-    scene.sim.registrate_blender_objects()
+    # scene.sim.registrate_blender_objects()
     for j in range(0, N_RAND_INIT_Q):
         q_start = scene.get_constrained_configuration_from_workspace(start_robot1_ee_tf, random_init_q[j,:])
         # time.sleep(20)
         q_end = scene.get_constrained_configuration_from_workspace(end_robot1_ee_tf, q_start)
         # time.sleep(20)
-        scene.sim.sim_step()
+        # scene.sim.sim_step()
         if not (scene.is_q_valid(q_start) and scene.is_q_valid(q_end)):
             continue
         scene.sim.sim_step()
@@ -62,8 +63,8 @@ def evaluate_planning(options):
                 for p in planners:
                     scene.sim.sim_step()
                     result = planning_once_by_planner(cp, p, q_start, q_end)
-                    scene.sim.sim_step()
-                    scene.sim.save_blender_date('dual_arm_scene.pkl')
+                    # scene.sim.sim_step()
+                    # scene.sim.save_blender_date('dual_arm_scene.pkl')
                     group_out_result = [ALGORITHM_NAMES[s], p, result['exec_time'], result['ok'], result['deviation']]
                     print("Write to dataframe planning info: {}".format(group_out_result))
                     benchmark_results.loc[len(benchmark_results.index)] = group_out_result
