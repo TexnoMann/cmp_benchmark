@@ -1,1 +1,1 @@
-# kmp_benchmark
+# cmp_benchmark
