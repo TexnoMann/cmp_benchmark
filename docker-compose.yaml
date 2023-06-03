@@ -1,0 +1,38 @@
+version: '3.9'
+name: 'constrained_planning_benchmark'
+
+services:
+  cp-benchmark:
+    image: cp-bechmark-image
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    container_name: cp-bechmark
+    command: ["/bin/bash", "-ci", "python3 "]
+    stdin_open: true
+    tty: true
+    environment:
+      - DISPLAY
+      - XAUTORITY
+      - QT_X11_NO_MITSHM=1
+    networks:
+      - general
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    ipc: host
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /dev:/dev
+      - ./:/benchmark
+
+networks:
+  general:
+    attachable: true
+    internal: false
+    driver: bridge
